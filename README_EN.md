@@ -37,12 +37,16 @@ python scripts/rig_glb.py model.glb            # -> model_rigged.glb
 python scripts/pipeline.py --in model_rigged.glb --live baseline.mdl \
        --out ./work --name mymodel \
        --deploy ./assets/model/mymodel/Meshes   # optional: copy straight into place
+
+# 2.5 Textures: extract the ones the model already ships with (costs no quota)
+python scripts/extract_glb_textures.py model.glb --out-dir ./tex --name mymodel
+python scripts/derive_normal.py ./tex/mymodel_D.png   # only if the GLB has no normal map
 ```
 
 Step ④ prints a `rest-reduction error`. It **must be `0.0000`** — anything above `0.01` and the
 script refuses to emit the file.
 
-Requirements: Python 3 + `numpy`, and Node.js (for `afk-rig`).
+Requirements: Python 3 + `numpy` + `Pillow`, and Node.js (for `afk-rig`).
 
 ---
 
@@ -144,9 +148,11 @@ scripts/
   retarget.py                   retarget onto the baseline skeleton + pre-skin + rest check
   pipeline.py                   all four steps + hard assertions
   probe_mdl.py                  parse a .mdl and dump vertices / bones / bounding box
+  extract_glb_textures.py       pull the model's own PBR maps out of the GLB (_D / _N / _MR)
+  derive_normal.py              derive a normal map from baseColor (Sobel)
 references/
   umd2-format.md                byte-level UMD2 layout
-  troubleshooting.md            12-entry fault dictionary (incl. dead ends already ruled out)
+  troubleshooting.md            14-entry fault dictionary (incl. dead ends already ruled out)
   generation-spec.md            AI prompt spec / afk-rig details / cloud quotas
 ```
 

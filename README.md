@@ -33,11 +33,15 @@ python scripts/rig_glb.py model.glb            # → model_rigged.glb
 python scripts/pipeline.py --in model_rigged.glb --live baseline.mdl \
        --out ./work --name mymodel \
        --deploy ./assets/model/mymodel/Meshes   # 可选：直接复制到部署目录
+
+# 2.5 贴图：先抽模型自带的，别去生成（零配额消耗）
+python scripts/extract_glb_textures.py model.glb --out-dir ./tex --name mymodel
+python scripts/derive_normal.py ./tex/mymodel_D.png   # GLB 没有法线贴图时再派生
 ```
 
 第 ④ 步会打印 `静止还原误差` —— **必须是 0.0000**，超过 0.01 脚本会拒绝产出文件。
 
-依赖：Python 3 + `numpy`、Node.js（`afk-rig`）。
+依赖：Python 3 + `numpy` + `Pillow`、Node.js（`afk-rig`）。
 
 ---
 
@@ -135,9 +139,11 @@ scripts/
   retarget.py                   重定向到现役骨架 + 预蒙皮 + 静止还原校验
   pipeline.py                   四步合一 + 强制校验
   probe_mdl.py                  解析 .mdl，打印顶点/骨骼/包围盒
+  extract_glb_textures.py        抽出模型自带的 PBR 贴图（_D / _N / _MR）
+  derive_normal.py               从 baseColor 派生法线贴图（Sobel）
 references/
   umd2-format.md                UMD2 二进制格式逐字节说明
-  troubleshooting.md            12 条故障字典（含"已排除的假线索"）
+  troubleshooting.md            14 条故障字典（含"已排除的假线索"）
   generation-spec.md            AI 生成提示词规范 / afk-rig 细节 / 云端配额
 ```
 
