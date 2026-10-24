@@ -53,6 +53,16 @@ NAME_MAP = {
     "L_ToeBase": "L_ToeBase", "L_ToeTip": "L_ToeBase",
     "R_Thigh": "R_Thigh", "R_Calf": "R_Calf", "R_Foot": "R_Foot",
     "R_ToeBase": "R_ToeBase", "R_ToeTip": "R_ToeBase",
+    # mixamo / afk-rig 骨架比我们的 28 骨多出手指与脚掌小球（L_Middle1 中指节、
+    # ball_leaf_l/r 脚掌球）。现役 41 骨**没有**这些细分骨，沿用"末端归父级"的
+    # 既有策略：手指归手、脚掌球归脚（与 L_HandTip→L_Hand、L_ToeTip→L_ToeBase
+    # 同一套路），否则 retarget 会以"映射缺失"直接中止。
+    "L_Middle1": "L_Hand", "R_Middle1": "R_Hand",
+    "L_Middle2": "L_Hand", "R_Middle2": "R_Hand",
+    "L_Middle3": "L_Hand", "R_Middle3": "R_Hand",
+    "L_Thumb1": "L_Hand", "R_Thumb1": "R_Hand",
+    "L_Index1": "L_Hand", "R_Index1": "R_Hand",
+    "ball_leaf_l": "L_Foot", "ball_leaf_r": "R_Foot",
 }
 
 LIVE_H = 0.998

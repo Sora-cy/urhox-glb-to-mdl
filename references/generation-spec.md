@@ -43,7 +43,20 @@ npx -y afk-rig export model.afk-rig.json --out model_rigged.glb \
   （`--mirror` 自动镜像左右；改完**必须重新 bind 再 export**）
 - Windows 下脚本里调 `npx` 要用 `npx.cmd`，否则 `FileNotFoundError`
 
-## 3. 生成服务的配额（若用云端生成）
+## 3. 省着用配额：贴图不要去生成
+
+生图配额（5 个/天）**只该花在模型本身**上。模型生成出来后：
+
+```bash
+python scripts/extract_glb_textures.py model_rigged.glb --out-dir ./tex --name mymodel
+python scripts/derive_normal.py ./tex/mymodel_D.png
+```
+
+生成的模型**自带 PBR 三件套**（至少 baseColor + metallicRoughness），抽出来即可；
+法线贴图经常没有，用 `derive_normal.py` 从 baseColor 派生。**整条贴图链路零配额消耗。**
+实测 13 个兵种 + 4 个角色全部走这条路，一个生图配额都没多花。
+
+## 4. 生成服务的配额（若用云端生成）
 
 | 限制 | 值 |
 |---|---|
@@ -62,11 +75,13 @@ npx -y afk-rig export model.afk-rig.json --out model_rigged.glb \
 配额窗口**不一定按本地 00:00 翻篇**：实测本地 14:42 提交的批次，到次日 00:12 仍是 5/5。
 两种可能：UTC 日切，或按提交时间滚动 24h。别在凌晨干等，排到早上和下午各试一次。
 
-## 4. 部署后的必跑校验
+## 5. 部署后的必跑校验
 
 1. 第 ④ 步输出 `静止还原误差：最大 0.0000`（> 0.01 不部署）
 2. 引擎回归里确认 `高度=0.998 骨骼=41`（骨骼数 = 借来的现役骨架数量）
 3. 本地姿态模拟三帧步态：双腿交替、无撕裂、脚掌有厚度
+4. 贴图：确认不是灰模、没有错位斑块；`.meta` 齐了、配置里 diffuse/normal 都接上
+5. 挂件（武器/道具）位置正常：不浮空、不插进身体（§13 的对齐四元数）
 
 > 很多引擎的验证报告会有 `result: FAIL`，但那是环境噪音（缺环境贴图、
 > 首帧着色器尖峰），以**脚本断言是否 PASSED** 为准，不要被报告级 FAIL 带偏。

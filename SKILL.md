@@ -19,6 +19,8 @@ UrhoX 的资源加载器**不解析 glTF**：把 GLB 直接放进 `assets/` 只�
 - 加载出来是空模型 / 0 骨骼 / 骨骼名乱码
 - 模型躺倒、身上有洞、腿被撕断、脚掌没厚度、一直 T-pose 举着手
 - 引擎解析阶段卡死（日志停在"开始解析 xxx"）
+- 模型是灰模 / 贴图满身错位斑块，或不知道贴图该从哪来
+- 挂在骨骼上的武器、道具位置歪了
 
 ## 三条不可违背的硬规则
 
@@ -38,14 +40,16 @@ UrhoX 的资源加载器**不解析 glTF**：把 GLB 直接放进 `assets/` 只�
 无骨骼 GLB
    │  scripts/rig_glb.py            （afk-rig 四步：start / inspect / bind / export）
    ▼
-带骨骼 GLB
-   │  scripts/pipeline.py           （一条命令跑完下面四步并强制校验）
-   ├─ ① glb_to_urhox.py   GLB → UMD2
-   ├─ ② reweight.py       重算蒙皮权重
-   ├─ ③ lower_arms.py     T-pose 手臂烘焙下垂
-   └─ ④ retarget.py       重定向到现役骨架 + 预蒙皮（断言误差 ≤ 0.01）
-   ▼
-可部署的 .mdl
+带骨骼 GLB ──────────────┐
+   │  scripts/pipeline.py │  scripts/extract_glb_textures.py   ← 独立于几何，可并行
+   │  （一条命令跑完下面   │  scripts/derive_normal.py
+   │    四步并强制校验）  │
+   ├─ ① glb_to_urhox.py   │  ─ 贴图：先用模型自带的，缺法线再派生；
+   ├─ ② reweight.py       │    两个都不耗任何生成配额
+   ├─ ③ lower_arms.py     │
+   └─ ④ retarget.py       │
+   ▼                      ▼
+可部署的 .mdl         _D / _N / _MR.png
 ```
 
 ### 第 0 步：准备一个"基底" `.mdl`
@@ -90,11 +94,26 @@ python scripts/lower_arms.py   in.mdl out.mdl [deg=65]
 python scripts/retarget.py     in.mdl baseline.mdl out.mdl [leg_blend=0] [live_height=0.998]
 ```
 
+### 第 2.5 步：贴图（先抽，别生成）
+
+```bash
+python scripts/extract_glb_textures.py model.glb --out-dir ./tex --name mymodel
+python scripts/derive_normal.py ./tex/mymodel_D.png      # GLB 没有法线贴图时
+```
+
+AI 生成的模型**自带 PBR 贴图**，抽出来就能用，UV 不需要翻转。只有在 GLB 真的
+没有贴图时才考虑其他方案。详见 `references/troubleshooting.md` §9。
+
 ### 第 3 步：部署后三件事
 
-1. 给资源生成 `.meta`（引擎需要 uuid 才好引用）
-2. 在配置里登记模型路径 + `height`（**模型自身空间身高**，不是世界身高）
+1. 给资源生成 `.meta`（引擎需要 uuid 才好引用），贴图也要
+2. 在配置里登记模型路径 + `height`（**模型自身空间身高**，不是世界身高），
+   并接上 `diffuse` / `normal` 贴图槽位
 3. 跑一次回归，确认 `高度=0.998 骨骼=<基底骨数>`
+
+⚠️ **Q 版模型借写实骨架时，步态幅度要收小**（实测量级：大腿 ±9° 而不是 ±30°）。
+骨架是按写实比例建的，Q 版短腿大头是"借骨"，大幅屈伸会把关节处的网格扯变形。
+同理，模型自带的装扮（头盔/披风/护目镜）**不要再叠加程序化挂件**。
 
 ## 排错
 
@@ -104,6 +123,8 @@ python scripts/retarget.py     in.mdl baseline.mdl out.mdl [leg_blend=0] [live_h
 - **"腿被撕断"** → 预蒙皮写成了 `Σ w·A⁻¹`（不可交换），不是网格问题
 - **"引擎卡死"** → 用了自建骨架数值，不是包围盒 / LOD 问题
 - **"模型躺倒"** → 多做了 Z-up 旋转，两边其实都是 Y-up
+- **"灰模 / 贴图斑块"** → 先用 `extract_glb_textures.py` 抽自带贴图，别去生成
+- **"渲染破碎 / Singular matrix"** → 源 GLB 自身有问题，重新生成比修它快（§12）
 
 格式细节（骨骼条目 121 字节、四元数 wxyz、`boneMappingCount=0` 等）
 见 `references/umd2-format.md`；生成提示词规范、afk-rig 细节、云端配额
@@ -111,6 +132,10 @@ python scripts/retarget.py     in.mdl baseline.mdl out.mdl [leg_blend=0] [live_h
 
 ## 依赖
 
-- Python 3 + `numpy`（`reweight.py` / `retarget.py` 用）
+- Python 3 + `numpy`（`reweight.py` / `retarget.py` / `derive_normal.py` 用）
+- Python 3 + `Pillow`（贴图抽取与法线派生用）
 - Node.js（`afk-rig`，绑骨骼那一步）
 - `scripts/probe_mdl.py` 用于解析 `.mdl` 核对顶点 / 骨骼 / 包围盒
+
+> 两个 Python 需求常被忽略：同一台机器上可能存在多个解释器，跑之前先确认
+> 目标解释器里 `numpy` 和 `PIL` 都能 import，否则会在流程中段报 `ModuleNotFoundError`。

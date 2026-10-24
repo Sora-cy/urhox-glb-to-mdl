@@ -206,6 +206,27 @@ def main() -> int:
     indices = read_accessor(js, bin_data, prim["indices"])
 
     nvert = len(positions)
+    # 索引清洗：mixamo 导出的 GLB 里可能残留越界索引（实测某角色模型有 3 个：
+    # 49672/16246/16256，远超 6942 个顶点）。不清洗会把"顶点指向空气"的碎片
+    # 三角形写进 .mdl，表现为模型上炸出几根尖刺，渲染器也可能直接越界崩溃。
+    # 处理方式：整三角形丢弃（保留其余几何，损失可忽略）。
+    # read_accessor 统一返回 (n, ncomp) 的二维序列，SCALAR 索引也是 1 元组，先摊平。
+    idx_flat = []
+    for v in indices:
+        idx_flat.append(int(v[0]) if isinstance(v, (list, tuple)) else int(v))
+    indices = idx_flat
+    bad, cleaned = 0, []
+    for i in range(0, len(indices) - 2, 3):
+        tri = (indices[i], indices[i + 1], indices[i + 2])
+        if tri[0] < nvert and tri[1] < nvert and tri[2] < nvert:
+            cleaned.extend(tri)
+        else:
+            bad += 1
+    if bad:
+        print("[warn] 丢弃 %d 个含越界索引的三角形（顶点 %d，索引最大 %d）"
+              % (bad, nvert, int(max(indices))))
+    # 下游写索引时按 idx[0] 取值（沿用 read_accessor 的 (n,1) 形状），摊平后要还原回去。
+    indices = [(v,) for v in cleaned]
     print("GLB: verts=%d indices=%d tris=%d" % (nvert, len(indices), len(indices) // 3))
 
     # 骨骼：优先用 skin.joints，其次退化为全部节点
