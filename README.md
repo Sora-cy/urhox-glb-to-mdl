@@ -143,7 +143,7 @@ scripts/
   derive_normal.py               从 baseColor 派生法线贴图（Sobel）
 references/
   umd2-format.md                UMD2 二进制格式逐字节说明
-  troubleshooting.md            14 条故障字典（含"已排除的假线索"）
+  troubleshooting.md            15 条故障字典（含"已排除的假线索"）
   generation-spec.md            AI 生成提示词规范 / afk-rig 细节 / 云端配额
 ```
 

@@ -204,29 +204,31 @@ def main() -> int:
         print("网格缺少索引")
         return 1
     indices = read_accessor(js, bin_data, prim["indices"])
-
-    nvert = len(positions)
-    # 索引清洗：mixamo 导出的 GLB 里可能残留越界索引（实测某角色模型有 3 个：
-    # 49672/16246/16256，远超 6942 个顶点）。不清洗会把"顶点指向空气"的碎片
-    # 三角形写进 .mdl，表现为模型上炸出几根尖刺，渲染器也可能直接越界崩溃。
+    # 索引清洗：mixamo 导出的 GLB 里可能残留越界索引（实测 hero_rigged_mixamo.glb
+    # 有 3 个：49672/16246/16256，远超 6942 个顶点）。不清洗会把"顶点指向空气"的
+    # 碎片三角形写进 .mdl，表现为模型上炸出几根尖刺，且渲染器可能直接越界崩溃。
     # 处理方式：整三角形丢弃（保留其余几何，损失可忽略）。
     # read_accessor 统一返回 (n, ncomp) 的二维序列，SCALAR 索引也是 1 元组，先摊平。
     idx_flat = []
     for v in indices:
         idx_flat.append(int(v[0]) if isinstance(v, (list, tuple)) else int(v))
     indices = idx_flat
-    bad, cleaned = 0, []
+    nv = len(positions)
+    bad = 0
+    cleaned = []
     for i in range(0, len(indices) - 2, 3):
         tri = (indices[i], indices[i + 1], indices[i + 2])
-        if tri[0] < nvert and tri[1] < nvert and tri[2] < nvert:
+        if tri[0] < nv and tri[1] < nv and tri[2] < nv:
             cleaned.extend(tri)
         else:
             bad += 1
     if bad:
         print("[warn] 丢弃 %d 个含越界索引的三角形（顶点 %d，索引最大 %d）"
-              % (bad, nvert, int(max(indices))))
+              % (bad, nv, int(max(indices))))
     # 下游写索引时按 idx[0] 取值（沿用 read_accessor 的 (n,1) 形状），摊平后要还原回去。
     indices = [(v,) for v in cleaned]
+
+    nvert = len(positions)
     print("GLB: verts=%d indices=%d tris=%d" % (nvert, len(indices), len(indices) // 3))
 
     # 骨骼：优先用 skin.joints，其次退化为全部节点
@@ -392,14 +394,19 @@ def main() -> int:
     # boneMapCount=0：实测现役 41 骨基底模型也是 0（引擎按「恒等映射」处理）。
     # 网上流传的"必须列出全部骨骼"在这版引擎上不适用，填了反而会让加载卡死。
     w.u32(0)
-    # 4 级 LOD，与现役基底同构（现役：lodDistance 0/11.96/32.67/90.18，
-    # 三角面 100%/85%/65%/45%）。这里共用同一份 VB/IB，只按比例递减绘制量；
-    # 引擎对只有 1 级 LOD 的模型行为未验证，先对齐结构。
+    # ⚠️ LOD 必须**全量**（2026-10-26 修，用户报"枪手没头 / 术士没帽子 / 部分怪物没头，
+    # 按 F2 放大后又冒出来"）。
+    # 旧版照抄现役基底的 4 级 LOD：距离 0/11.96/32.67/90.18，索引量 100%/85%/65%/45%。
+    # 但所谓"减面"只是 `indexCount = 总索引 × ratio`，而索引是按**部件顺序**排列的，
+    # 截掉尾部 35% = **直接砍掉模型后排的部件**（头、帽子、披风、手）。
+    # 相机固定在离角色 32.6 m（正交），正好落在 32.67 那一级 → 永远用 65% 的索引，
+    # 于是"远处没头"。F2 调试镜头换了相机距离才切回 0 级，所以一放大部件就回来了。
+    # 保留 4 级结构（引擎对 1 级 LOD 未验证），但距离拉到永不触发、每级都是全量。
     lods = [
         (0.0, 1.00),
-        (11.96, 0.85),
-        (32.67, 0.65),
-        (90.18, 0.45),
+        (1.0e6, 1.00),
+        (2.0e6, 1.00),
+        (3.0e6, 1.00),
     ]
     w.u32(len(lods))              # LOD levels
     for dist, ratio in lods:

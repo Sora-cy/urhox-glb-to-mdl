@@ -152,7 +152,7 @@ scripts/
   derive_normal.py              derive a normal map from baseColor (Sobel)
 references/
   umd2-format.md                byte-level UMD2 layout
-  troubleshooting.md            14-entry fault dictionary (incl. dead ends already ruled out)
+  troubleshooting.md            15-entry fault dictionary (incl. dead ends already ruled out)
   generation-spec.md            AI prompt spec / afk-rig details / cloud quotas
 ```
 
