@@ -141,9 +141,12 @@ scripts/
   probe_mdl.py                  解析 .mdl，打印顶点/骨骼/包围盒
   extract_glb_textures.py        抽出模型自带的 PBR 贴图（_D / _N / _MR）
   derive_normal.py               从 baseColor 派生法线贴图（Sobel）
+  decimate_glb.py               GLB 顶点聚类减面（面数炸裂的模型）
+  shrink_base.py                收缩"展示底板"（只挪顶点，不改三角/索引数）
+  prop_single_bone.py           静物权重全归单根骨骼（避免扭成麻花）
 references/
   umd2-format.md                UMD2 二进制格式逐字节说明
-  troubleshooting.md            15 条故障字典（含"已排除的假线索"）
+  troubleshooting.md            19 条故障字典（含"已排除的假线索"）
   generation-spec.md            AI 生成提示词规范 / afk-rig 细节 / 云端配额
 ```
 
